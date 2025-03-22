@@ -401,6 +401,8 @@ node_modules
 - feat(pages): 创建首页、图片生成页面和图片浏览页面
 ```
 
+### 测试
+
 现在可以再看看运行的效果了。
 
 执行命令：npm run dev
@@ -437,3 +439,125 @@ node_modules
 
 ![生成图片报错](https://fastly.jsdelivr.net/gh/bucketio/img1@main/2025/03/22/1742650183666-97112b13-6b63-4f0c-ad29-3bc8b2343d6d.png)
 
+可能是网络的问题或者API调用代码有问题
+
+我让他看一下参考代码 
+https://ai.google.dev/gemini-api/docs/image-generation?hl=zh-cn#node.js
+
+```nodejs
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fs = require("fs");
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+async function generateImage() {
+  const contents = "Hi, can you create a 3d rendered image of a pig " +
+                  "with wings and a top hat flying over a happy " +
+                  "futuristic scifi city with lots of greenery?";
+
+  // Set responseModalities to include "Image" so the model can generate  an image
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash-exp-image-generation",
+    generationConfig: {
+        responseModalities: ['Text', 'Image']
+    },
+  });
+
+  try {
+    const response = await model.generateContent(contents);
+    for (const part of  response.response.candidates[0].content.parts) {
+      // Based on the part type, either show the text or save the image
+      if (part.text) {
+        console.log(part.text);
+      } else if (part.inlineData) {
+        const imageData = part.inlineData.data;
+        const buffer = Buffer.from(imageData, 'base64');
+        fs.writeFileSync('gemini-native-image.png', buffer);
+        console.log('Image saved as gemini-native-image.png');
+      }
+    }
+  } catch (error) {
+    console.error("Error generating content:", error);
+  }
+}
+
+generateImage();
+```
+
+curl版本
+```bash
+curl -s -X POST \
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=$GEMINI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "parts": [
+        {"text": "Hi, can you create a 3d rendered image of a pig with wings and a top hat flying over a happy futuristic scifi city with lots of greenery?"}
+      ]
+    }],
+    "generationConfig":{"responseModalities":["Text","Image"]}
+  }' \
+  | grep -o '"data": "[^"]*"' \
+  | cut -d'"' -f4 \
+  | base64 --decode > gemini-native-image.png
+```
+
+AI 一顿输出，之后再来验证一下看看看。
+
+![修复生成图片的api调用错误](https://fastly.jsdelivr.net/gh/bucketio/img19@main/2025/03/22/1742651568538-20c608e5-0042-45e0-a606-0ea653e6c827.png)
+
+这次生成了一只猫的图片
+
+![生成图片成功](https://fastly.jsdelivr.net/gh/bucketio/img3@main/2025/03/22/1742653740411-1580a5db-3270-487a-b055-f320aa3ce898.png)
+
+
+浏览图片库居然也能用
+
+![浏览图片库](https://fastly.jsdelivr.net/gh/bucketio/img17@main/2025/03/22/1742653788831-2f20a7b0-b417-46a3-9d31-534ccfaec75d.png)
+
+
+加上一只猪
+
+![加上一只猪](https://fastly.jsdelivr.net/gh/bucketio/img0@main/2025/03/22/1742653877447-9be08942-e485-4216-8fd5-f30f9b56438a.png)
+
+### 部署
+
+1. 发布项目到github
+点 “Publish Branch” 按钮
+![发布项目](https://fastly.jsdelivr.net/gh/bucketio/img2@main/2025/03/22/1742656656784-71c27fdf-4626-4da9-b713-b547135d41f8.png)
+
+然后就可以在 github 上看到这个代码仓库了：
+https://github.com/xmx0632/photoshow 
+
+2. 发布到 vercel 
+登录进 vercel 
+
+新建一个项目
+![photoshow](https://fastly.jsdelivr.net/gh/bucketio/img5@main/2025/03/22/1742657233565-1f82ac36-ba96-4074-9e9c-abf1b95fc2d0.png)
+
+
+部署项目
+![部署](https://fastly.jsdelivr.net/gh/bucketio/img16@main/2025/03/22/1742657395440-a17e2b32-1e33-468b-becc-6ea5d1b85a28.png)
+
+部署成功
+![部署成功](https://fastly.jsdelivr.net/gh/bucketio/img9@main/2025/03/22/1742657554511-67cc2cc5-3e57-4fd1-97c7-1d3e078d2383.png)
+
+配置环境变量
+
+GEMINI_API_KEY 密钥配置
+![GEMINI_API_KEY 密钥配置](https://fastly.jsdelivr.net/gh/bucketio/img7@main/2025/03/22/1742657804631-86446872-11ca-41b7-845d-fc4a1e9175d5.png)
+
+
+访问网站
+https://photoshow-alpha.vercel.app/
+
+成功生成一只猫
+![生成一只猫](https://fastly.jsdelivr.net/gh/bucketio/img15@main/2025/03/22/1742657860793-b411dc3f-5205-4983-817d-5dbea7cdb628.png)
+
+接下来如果需要在国内访问，给他加上域名就可以了。
+
+至此一个不花一毛钱的网站已经开发部署完成。以上就是第一个迭代版本的开发过程了，希望对你有帮助。
+
+
+**既然看到这里了，如果觉得不错，随手点个赞、在看、转发三连吧，如果想第一时间收到推送，也可以给我个星标⭐～
+谢谢你看我的文章，我们下次再见。**
