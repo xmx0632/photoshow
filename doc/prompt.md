@@ -37,6 +37,73 @@
 对所有功能进行全面测试，确保图片生成和浏览功能正常工作。测试不同设备和浏览器的兼容性，修复可能出现的问题。
 ```
 
+
+这是生成图片的参考代码，请检查现在的实现是不是有问题，使用 curl 的方式实现
+
+```nodejs
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fs = require("fs");
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+async function generateImage() {
+  const contents = "Hi, can you create a 3d rendered image of a pig " +
+                  "with wings and a top hat flying over a happy " +
+                  "futuristic scifi city with lots of greenery?";
+
+  // Set responseModalities to include "Image" so the model can generate  an image
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash-exp-image-generation",
+    generationConfig: {
+        responseModalities: ['Text', 'Image']
+    },
+  });
+
+  try {
+    const response = await model.generateContent(contents);
+    for (const part of  response.response.candidates[0].content.parts) {
+      // Based on the part type, either show the text or save the image
+      if (part.text) {
+        console.log(part.text);
+      } else if (part.inlineData) {
+        const imageData = part.inlineData.data;
+        const buffer = Buffer.from(imageData, 'base64');
+        fs.writeFileSync('gemini-native-image.png', buffer);
+        console.log('Image saved as gemini-native-image.png');
+      }
+    }
+  } catch (error) {
+    console.error("Error generating content:", error);
+  }
+}
+
+generateImage();
+```
+
+
+curl 版本
+
+```bash
+curl -s -X POST \
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=$GEMINI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "parts": [
+        {"text": "Hi, can you create a 3d rendered image of a pig with wings and a top hat flying over a happy futuristic scifi city with lots of greenery?"}
+      ]
+    }],
+    "generationConfig":{"responseModalities":["Text","Image"]}
+  }' \
+  | grep -o '"data": "[^"]*"' \
+  | cut -d'"' -f4 \
+  | base64 --decode > gemini-native-image.png
+
+```
+
+
+
 ### 发布
 
 ```text
