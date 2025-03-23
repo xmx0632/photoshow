@@ -63,14 +63,14 @@ export function ImageGenerationForm() {
     
     try {
       // 获取现有保存的图片
-      const savedImagesJson = localStorage.getItem('savedImages') || '[]';
+      const savedImagesJson = localStorage.getItem('generatedImages') || '[]';
       const currentSavedImages = JSON.parse(savedImagesJson);
       
       // 创建新的图片对象
       const newImage = {
         id: Date.now().toString(),
         prompt,
-        imageData: generatedImage,
+        imageUrl: generatedImage, // 使用 imageUrl 字段名保持一致
         createdAt: new Date().toISOString(),
       };
       
@@ -78,7 +78,7 @@ export function ImageGenerationForm() {
       const updatedSavedImages = [newImage, ...currentSavedImages];
       
       // 更新本地存储
-      localStorage.setItem('savedImages', JSON.stringify(updatedSavedImages));
+      localStorage.setItem('generatedImages', JSON.stringify(updatedSavedImages));
       
       // 更新状态
       setSavedImages(updatedSavedImages);

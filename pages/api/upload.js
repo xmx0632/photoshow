@@ -32,15 +32,32 @@ export default async function handler(req, res) {
 
     // 处理 JSON 请求（Base64 编码的图片数据）
     if (contentType.includes('application/json')) {
-      const { imageData, prompt, metadata } = req.body;
+      // 手动解析 JSON 请求体
+      const jsonData = await new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk.toString();
+        });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            resolve(data);
+          } catch (error) {
+            reject(new Error('解析 JSON 请求失败'));
+          }
+        });
+        req.on('error', reject);
+      });
+      
+      const { imageUrl, prompt, metadata } = jsonData;
 
       // 验证必要参数
-      if (!imageData) {
+      if (!imageUrl) {
         return res.status(400).json({ error: '缺少图片数据' });
       }
 
       // 上传图片
-      const result = await uploadImage(imageData, prompt || '', metadata || {});
+      const result = await uploadImage(imageUrl, prompt || '', metadata || {});
       return res.status(200).json(result);
     }
     // 处理表单请求（文件上传）

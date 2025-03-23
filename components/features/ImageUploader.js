@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { saveGeneratedImage } from '../../lib/gemini';
 
 /**
  * 图片上传组件
@@ -27,7 +28,7 @@ export function ImageUploader({ imageData, prompt, onUploadComplete, onUploadErr
       
       // 准备上传数据
       const uploadData = {
-        imageData,
+        imageUrl: imageData, // 使用 imageUrl 字段名保持一致
         prompt,
         metadata: {
           createdAt: new Date().toISOString(),
@@ -63,6 +64,25 @@ export function ImageUploader({ imageData, prompt, onUploadComplete, onUploadErr
       const result = await response.json();
       setUploadProgress(100);
       setUploadedImageUrl(result.url);
+      
+      // 同时保存到本地存储，确保在浏览图库中也能看到
+      if (typeof window !== 'undefined') {
+        // 使用原生 localStorage 直接保存，确保字段名称一致
+        try {
+          const savedImages = JSON.parse(localStorage.getItem('generatedImages') || '[]');
+          const newImage = {
+            id: Date.now().toString(),
+            prompt,
+            imageUrl: imageData, // 使用 imageUrl 字段名保持一致
+            createdAt: new Date().toISOString(),
+          };
+          savedImages.unshift(newImage);
+          localStorage.setItem('generatedImages', JSON.stringify(savedImages));
+          console.log('图片已保存到本地存储');
+        } catch (err) {
+          console.error('保存到本地存储失败:', err);
+        }
+      }
       
       // 调用完成回调
       onUploadComplete?.(result);
