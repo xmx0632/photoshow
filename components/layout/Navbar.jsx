@@ -38,6 +38,9 @@ export function Navbar() {
             <Link href="/browse" className="px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
               浏览图库
             </Link>
+            <Link href="/manage" className="px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+              图片管理
+            </Link>
           </div>
           
           {/* 移动端菜单按钮 */}
@@ -96,6 +99,9 @@ export function Navbar() {
           </Link>
           <Link href="/browse" className="block px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
             浏览图库
+          </Link>
+          <Link href="/manage" className="block px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+            图片管理
           </Link>
         </div>
       </div>

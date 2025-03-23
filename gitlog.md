@@ -13,3 +13,10 @@
 - fix(ui): 修复输入框文字颜色问题，确保文字在各种主题模式下可见
 - feat(env): 添加dotenv支持，优化环境变量加载方式，提供环境变量配置示例
 - feat(analytics): 集成Vercel Web Analytics功能，添加访问统计和分析能力
+- feat(storage): 集成Cloudflare R2云存储，实现图片上传和持久化存储
+- feat(api): 添加图片上传API路由，支持Base64和文件上传方式
+- feat(components): 开发图片上传组件，集成到图片生成表单
+- feat(metadata): 实现图片元数据管理，支持标签和分类功能
+- feat(pages): 添加图片管理页面，支持标签管理和存储监控
+- feat(backup): 实现数据备份和恢复功能，确保元数据安全
+- feat(nav): 更新导航栏，添加图片管理页面入口
