@@ -57,7 +57,9 @@ export default async function handler(req, res) {
       }
 
       // 上传图片
-      const result = await uploadImage(imageUrl, prompt || '', metadata || {});
+      // 如果客户端提供了文件名，使用客户端的文件名保持一致性
+      const fileName = metadata?.fileName || null;
+      const result = await uploadImage(imageUrl, prompt || '', { ...metadata, fileName });
       return res.status(200).json(result);
     }
     // 处理表单请求（文件上传）

@@ -66,16 +66,50 @@ export function ImageGenerationForm() {
     try {
       setIsLoading(true);
       
+      // 首先检查是否已经有相同提示词的图片
+      const existingImages = await getAllImages();
+      const matchingImages = existingImages.filter(img => img.prompt === prompt);
+      
+      // 如果已经有相同提示词的图片，检查是否是相同的图片内容
+      for (const existingImage of matchingImages) {
+        // 如果图片URL相同，说明是相同的图片
+        if (existingImage.imageUrl === generatedImage) {
+          console.log('图片已经存在于 IndexedDB 中，不需要重复保存');
+          alert('图片已经保存到本地');
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // 生成唯一文件名，使用时间戳和随机字符串
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 10);
+      const fileName = `${timestamp}-${randomStr}.png`;
+      
       // 创建新的图片对象
       const newImage = {
-        id: Date.now().toString(),
+        id: fileName,  // 使用文件名作为 ID
         prompt,
         imageUrl: generatedImage,
         createdAt: new Date().toISOString(),
+        fileName: fileName  // 存储文件名，与云存储保持一致的命名方式
       };
       
       // 保存到 IndexedDB
       await saveImage(newImage);
+      
+      // 同步缓存
+      try {
+        await fetch('/api/images/cache', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log('保存图片后缓存同步成功');
+      } catch (syncError) {
+        console.warn('缓存同步失败:', syncError);
+      }
       
       // 重新加载图片列表
       const images = await getAllImages();
@@ -151,7 +185,7 @@ export function ImageGenerationForm() {
         <textarea
           id="prompt"
           rows="4"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
           placeholder="描述您想要生成的图片，例如：一只在雪地上奔跑的狼，背景是满月和雪松林"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -187,15 +221,7 @@ export function ImageGenerationForm() {
             </div>
           </div>
           
-          {/* 保存按钮 */}
-          <div className="mt-4 flex space-x-2">
-            <button
-              onClick={saveImageLocally}
-              className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              保存到本地
-            </button>
-          </div>
+          {/* 移除了保存到本地按钮，只保留上传到云存储按钮 */}
           
           {/* 上传组件 */}
           <ImageUploader

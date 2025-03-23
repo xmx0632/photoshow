@@ -21,9 +21,76 @@ export function ImageGrid() {
         try {
           setIsLoading(true);
           
-          // 从 IndexedDB 加载图片
-          const savedImages = await getAllImages();
-          setImages(savedImages);
+          // 首先尝试从缓存服务获取图片
+          try {
+            const cacheResponse = await fetch('/api/images/cache');
+            if (cacheResponse.ok) {
+              const cacheData = await cacheResponse.json();
+              if (cacheData.success && cacheData.images && cacheData.images.length > 0) {
+                console.log(`从缓存获取到 ${cacheData.images.length} 张图片`);
+                setImages(cacheData.images);
+                
+                // 检查存储空间使用情况
+                const usage = await getStorageUsage();
+                console.log(`当前存储使用: ${usage.totalSizeMB} MB / 50 MB, ${usage.count} 张图片`);
+                
+                // 如果接近限制，显示警告
+                if (usage.isExceedingLimit) {
+                  console.warn('本地存储空间即将用尽，旧图片将被自动清理');
+                }
+                
+                setIsLoading(false);
+                return; // 如果缓存获取成功，直接返回
+              }
+            }
+          } catch (cacheError) {
+            console.warn('从缓存获取图片失败，将使用备用方案:', cacheError);
+          }
+          
+          // 如果缓存获取失败，则使用原来的方法
+          // 从 IndexedDB 加载本地图片
+          const localImages = await getAllImages();
+          
+          // 尝试从云存储加载图片
+          let cloudImages = [];
+          try {
+            // 使用 fetch 请求获取云存储图片
+            const response = await fetch('/api/images');
+            if (response.ok) {
+              const data = await response.json();
+              cloudImages = data.images || [];
+              
+              // 将云存储图片转换为与本地图片相同的格式
+              cloudImages = cloudImages.map(img => ({
+                id: img.key,
+                prompt: img.metadata?.prompt || '无提示词',
+                imageUrl: img.url,
+                createdAt: img.lastModified || new Date().toISOString(),
+                isCloudImage: true, // 标记为云存储图片
+                cloudFileName: img.key,
+                fileName: img.key // 也将云存储文件名作为本地文件名，便于去重
+              }));
+            }
+          } catch (cloudError) {
+            console.error('加载云存储图片失败:', cloudError);
+          }
+          
+          // 合并本地和云存储图片，去除重复项
+          const mergedImages = mergeAndDeduplicateImages(localImages, cloudImages);
+          setImages(mergedImages);
+          
+          // 同步缓存
+          try {
+            await fetch('/api/images/cache', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            console.log('缓存同步成功');
+          } catch (syncError) {
+            console.warn('缓存同步失败:', syncError);
+          }
           
           // 检查存储空间使用情况
           const usage = await getStorageUsage();
@@ -43,6 +110,55 @@ export function ImageGrid() {
       loadImages();
     }
   }, []);
+  
+  /**
+   * 合并本地和云存储图片，去除重复项
+   * 优先保留本地图片，如果本地没有才显示云存储图片
+   */
+  const mergeAndDeduplicateImages = (localImages, cloudImages) => {
+    // 创建一个集合来跟踪已处理的云存储文件名
+    const processedCloudFileNames = new Set();
+    // 创建一个集合来跟踪已处理的本地图片文件名
+    const processedLocalFileNames = new Set();
+    const result = [];
+    
+    // 首先添加所有本地图片
+    for (const localImage of localImages) {
+      // 记录本地图片文件名
+      if (localImage.fileName) {
+        processedLocalFileNames.add(localImage.fileName);
+      }
+      
+      // 如果本地图片有云存储信息，记录云存储文件名
+      if (localImage.cloudFileName) {
+        processedCloudFileNames.add(localImage.cloudFileName);
+      }
+      
+      result.push(localImage);
+    }
+    
+    // 然后添加不在本地的云存储图片
+    for (const cloudImage of cloudImages) {
+      // 如果这个云存储文件还没有处理过，则添加这张云存储图片
+      if (cloudImage.key && 
+          !processedCloudFileNames.has(cloudImage.key) && 
+          !processedLocalFileNames.has(cloudImage.key)) {
+        result.push({
+          id: cloudImage.key,  // 使用云存储文件名作为 ID
+          prompt: cloudImage.metadata?.prompt || '无提示词',
+          imageUrl: cloudImage.url,
+          createdAt: cloudImage.lastModified || new Date().toISOString(),
+          isCloudImage: true,  // 标记为云存储图片
+          cloudFileName: cloudImage.key,
+          fileName: cloudImage.key  // 也将云存储文件名作为本地文件名，便于去重
+        });
+        processedCloudFileNames.add(cloudImage.key);
+      }
+    }
+    
+    // 按创建时间排序，最新的在前
+    return result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  };
 
   /**
    * 处理图片删除
@@ -50,10 +166,39 @@ export function ImageGrid() {
    */
   const handleDelete = async (imageId) => {
     try {
-      // 从 IndexedDB 中删除图片
-      await deleteImage(imageId);
+      const imageToDelete = images.find(img => img.id === imageId);
+      
+      if (imageToDelete) {
+        // 如果是云存储图片，调用云存储删除 API
+        if (imageToDelete.isCloudImage) {
+          try {
+            await fetch(`/api/images?fileName=${encodeURIComponent(imageId)}`, {
+              method: 'DELETE',
+            });
+          } catch (cloudError) {
+            console.error('从云存储删除图片失败:', cloudError);
+          }
+        } else {
+          // 从 IndexedDB 中删除本地图片
+          await deleteImage(imageId);
+        }
+      }
+      
       // 更新状态
       setImages(prevImages => prevImages.filter(image => image.id !== imageId));
+      
+      // 同步缓存
+      try {
+        await fetch('/api/images/cache', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log('删除图片后缓存同步成功');
+      } catch (syncError) {
+        console.warn('缓存同步失败:', syncError);
+      }
     } catch (error) {
       console.error('删除图片失败:', error);
     }

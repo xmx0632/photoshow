@@ -60,9 +60,30 @@ async function handleDeleteImage(req, res) {
     return res.status(400).json({ error: '缺少文件名参数' });
   }
   
-  // 删除图片
-  const result = await deleteImage(fileName);
-  return res.status(200).json(result);
+  try {
+    // 删除云存储中的图片
+    const cloudResult = await deleteImage(fileName);
+    
+    // 尝试删除本地 IndexedDB 中的图片
+    try {
+      // 导入 IndexedDB 删除函数
+      const { deleteImage: deleteLocalImage } = require('../../lib/indexedDB');
+      // 尝试删除本地图片，使用相同的 ID
+      await deleteLocalImage(fileName);
+      console.log(`本地图片删除成功: ${fileName}`);
+    } catch (localError) {
+      // 即使本地删除失败也不影响云存储删除结果
+      console.warn(`本地图片删除失败: ${localError.message}`);
+    }
+    
+    return res.status(200).json({
+      ...cloudResult,
+      message: `成功删除图片: ${fileName}`,
+    });
+  } catch (error) {
+    console.error('删除图片失败:', error);
+    return res.status(500).json({ error: `删除图片失败: ${error.message}` });
+  }
 }
 
 /**

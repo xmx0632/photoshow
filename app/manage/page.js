@@ -22,24 +22,90 @@ export default function ManagePage() {
     try {
       setIsLoading(true);
       
-      // 构建 API URL
-      let url = '/api/images';
-      if (tag) {
-        url += `?tag=${encodeURIComponent(tag)}`;
-      }
+      // 先尝试使用缓存 API 获取图片
+      let url = '/api/images/cache';
       
       // 获取图片列表
       const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error('获取图片列表失败');
+        throw new Error('获取缓存图片列表失败');
       }
       
       const data = await response.json();
-      setImages(data.images || []);
+      let imagesList = data.images || [];
+      
+      // 格式化图片数据，兼容缓存 API 和原始 API 的不同格式
+      imagesList = imagesList.map(image => {
+        // 提取文件名，用于标签管理
+        const fileName = image.fileName || image.cloudFileName || 
+                        (image.id && image.id.includes('.') ? image.id : null);
+        
+        return {
+          // 兼容两种格式
+          key: image.key || image.id || image.fileName || image.cloudFileName,
+          url: image.url || image.imageUrl,
+          lastModified: image.lastModified || image.createdAt,
+          // 保存原始文件名和ID信息，用于标签管理
+          fileName: fileName,
+          cloudFileName: image.cloudFileName,
+          originalId: image.id,
+          metadata: {
+            // 如果有 metadata 就使用，否则创建新的 metadata 对象
+            ...image.metadata,
+            // 如果没有 metadata.prompt 但有独立的 prompt 字段，则使用它
+            prompt: image.metadata?.prompt || image.prompt || '无提示词',
+            // 确保标签字段存在
+            tags: image.metadata?.tags || image.tags || '[]'
+          }
+        };
+      });
+      
+      // 如果指定了标签，过滤结果
+      if (tag) {
+        imagesList = imagesList.filter(image => {
+          const tags = image.metadata?.tags ? JSON.parse(image.metadata.tags) : [];
+          return tags.includes(tag);
+        });
+      }
+      
+      setImages(imagesList);
     } catch (err) {
       console.error('加载图片失败:', err);
       setError('加载图片失败: ' + err.message);
+      
+      // 如果缓存 API 失败，尝试使用原始 API
+      try {
+        // 构建原始 API URL
+        let fallbackUrl = '/api/images';
+        if (tag) {
+          fallbackUrl += `?tag=${encodeURIComponent(tag)}`;
+        }
+        
+        const fallbackResponse = await fetch(fallbackUrl);
+        
+        if (!fallbackResponse.ok) {
+          throw new Error('获取图片列表失败');
+        }
+        
+        const fallbackData = await fallbackResponse.json();
+        // 格式化原始 API 返回的图片数据
+        const formattedImages = (fallbackData.images || []).map(image => ({
+          key: image.key || image.id || image.fileName || image.cloudFileName,
+          url: image.url || image.imageUrl,
+          lastModified: image.lastModified || image.createdAt,
+          metadata: {
+            ...image.metadata,
+            prompt: image.metadata?.prompt || image.prompt || '无提示词',
+            tags: image.metadata?.tags || image.tags || '[]'
+          }
+        }));
+        setImages(formattedImages);
+        setError(null); // 清除错误，因为回退方案成功了
+      } catch (fallbackErr) {
+        console.error('回退方案也失败:', fallbackErr);
+        // 保留原始错误
+      }
     } finally {
       setIsLoading(false);
     }
@@ -86,12 +152,29 @@ export default function ManagePage() {
     }
     
     try {
+      // 删除图片
       const response = await fetch(`/api/images?fileName=${encodeURIComponent(fileName)}`, {
         method: 'DELETE',
       });
       
       if (!response.ok) {
         throw new Error('删除图片失败');
+      }
+      
+      // 删除成功后，同步缓存
+      try {
+        // 调用缓存同步 API
+        const syncResponse = await fetch('/api/images/cache', {
+          method: 'POST',
+        });
+        
+        if (syncResponse.ok) {
+          console.log('缓存同步成功');
+        } else {
+          console.warn('缓存同步失败');
+        }
+      } catch (syncErr) {
+        console.warn('缓存同步出错:', syncErr);
       }
       
       // 重新加载图片列表
@@ -107,17 +190,93 @@ export default function ManagePage() {
   // 添加标签
   const addTag = async (imageId, tag) => {
     try {
+      console.log('正在添加标签，图片ID:', imageId, '标签:', tag);
+      
+      // 查找图片对象
+      const image = images.find(img => img.key === imageId);
+      if (!image) {
+        throw new Error('找不到图片信息');
+      }
+      
+      // 输出图片完整信息便于调试
+      console.log('图片完整信息:', JSON.stringify(image, null, 2));
+      
+      // 确定正确的图片ID
+      // 优先使用 IndexedDB 中的 ID，因为这是本地存储的原始 ID
+      let effectiveImageId;
+      
+      // 从各种可能的属性中提取有效ID
+      if (image.originalId && image.originalId.includes('.png')) {
+        // 使用 IndexedDB 中的原始 ID
+        effectiveImageId = image.originalId;
+      } else if (image.fileName) {
+        // 使用文件名
+        effectiveImageId = image.fileName;
+      } else if (image.cloudFileName) {
+        // 使用云存储文件名
+        effectiveImageId = image.cloudFileName;
+      } else {
+        // 其他情况使用 key
+        effectiveImageId = image.key;
+      }
+      
+      console.log('使用有效图片ID:', effectiveImageId);
+      
+      // 检查元数据文件中是否已存在该ID
+      try {
+        const checkResponse = await fetch(`/api/metadata?id=${encodeURIComponent(effectiveImageId)}`);
+        const checkResult = await checkResponse.json();
+        
+        // 如果元数据不存在，则创建它
+        if (!checkResponse.ok || !checkResult.metadata) {
+          console.log('元数据不存在，创建新的元数据');
+          
+          // 收集图片元数据
+          const imageMetadata = {
+            id: effectiveImageId,
+            url: image.url,
+            prompt: image.metadata?.prompt || '',
+            createdAt: image.lastModified || new Date().toISOString(),
+            tags: []
+          };
+          
+          // 保存元数据
+          const saveResponse = await fetch('/api/metadata', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ metadata: imageMetadata }),
+          });
+          
+          if (!saveResponse.ok) {
+            console.warn('保存元数据失败，但仍尝试添加标签');
+          } else {
+            console.log('元数据保存成功');
+          }
+        } else {
+          console.log('元数据已存在，直接添加标签');
+        }
+      } catch (metaErr) {
+        console.warn('检查元数据出错:', metaErr);
+      }
+      
+      // 添加标签
       const response = await fetch('/api/tags', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ imageId, tag }),
+        body: JSON.stringify({ imageId: effectiveImageId, tag }),
       });
       
+      const result = await response.json();
+      
       if (!response.ok) {
-        throw new Error('添加标签失败');
+        throw new Error(result.error || '添加标签失败');
       }
+      
+      console.log('标签添加成功:', result);
       
       // 重新加载图片和标签
       loadImages(selectedTag);
@@ -320,6 +479,7 @@ export default function ManagePage() {
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     className="object-cover"
+                    unoptimized={true} // 避免 Next.js 对外部图片的优化问题
                   />
                 </div>
                 
@@ -353,7 +513,7 @@ export default function ManagePage() {
                     <input
                       type="text"
                       placeholder="添加标签..."
-                      className="text-sm border rounded px-2 py-1 flex-grow"
+                      className="text-sm border rounded px-2 py-1 flex-grow text-gray-900 dark:text-white"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && e.target.value.trim()) {
                           addTag(image.key, e.target.value.trim());
@@ -366,7 +526,19 @@ export default function ManagePage() {
                   {/* 操作按钮 */}
                   <div className="mt-3 flex justify-between">
                     <button
-                      onClick={() => deleteImage(image.key)}
+                      onClick={() => {
+                        // 获取正确的文件名用于删除
+                        const fileName = image.key || 
+                                         image.fileName || 
+                                         image.cloudFileName || 
+                                         (image.url && image.url.split('/').pop().split('?')[0]);
+                        if (fileName) {
+                          deleteImage(fileName);
+                        } else {
+                          console.error('无法获取图片文件名', image);
+                          setError('无法删除图片：文件名不存在');
+                        }
+                      }}
                       className="text-red-500 hover:text-red-700 text-sm"
                     >
                       删除

@@ -4,7 +4,7 @@
 
 - docs(design): 修改设计文档，优化为MVP快速开发版本，使用NextJS和Tailwind CSS，集成Gemini API
 - docs(prompt): 完善开发提示词文档，为各个迭代阶段添加详细的开发指南
-- feat(init): 初始化Next.js项目，配置Tailwind CSS和项目结构
+- feat(init): 初始Next.js项目，配置Tailwind CSS和项目结构
 - feat(layout): 创建基础布局组件，包括导航栏和页脚
 - feat(api): 集成Gemini API，实现图片生成功能
 - feat(components): 开发图片生成表单和图片浏览组件
@@ -24,3 +24,18 @@
 - fix(storage): 修复图片在浏览图库和图片管理中不显示的问题，统一本地存储和云存储的数据结构
 - fix(api): 修复图片上传API错误，添加手动解析JSON请求体的逻辑，统一字段名称
 - feat(storage): 使用 IndexedDB 替代 localStorage 保存图片，支持更大存储空间并自动清理旧图片
+- fix(ui): 修复浏览图库中显示重复图片的问题，优先显示本地缓存图片
+- fix(storage): 修复先上传图片再保存导致浏览图库中重复显示的问题
+- fix(storage): 修复 IndexedDB 中同一张图片使用不同 ID 重复保存的问题
+- feat(cache): 添加服务端图片列表缓存功能，加速页面响应速度并确保数据一致性
+- fix(cache): 修复服务端缓存使用 IndexedDB 导致的错误，优化了缓存同步逻辑
+- fix(cache): 全面修复服务端缓存问题，增强了环境检测和错误处理，确保图片正确显示
+- fix(images): 修复图片管理页面无法显示云存储图片的问题，使用缓存 API 获取图片
+- fix(delete): 优化删除图片逻辑，确保同时删除本地和云存储中的图片，并更新缓存
+- fix(ui): 修复图片管理页面图片无法显示和提示词不正确的问题，兼容不同数据源的图片格式
+- fix(ui): 修复提示词输入框文本颜色问题，添加浅色模式下的文本颜色样式
+- fix(tags): 修复图片管理页面添加标签失败的问题，改进图片ID处理逻辑
+- fix(ui): 修复添加标签输入框文本颜色问题，增强输入框可读性
+- fix(metadata): 添加元数据 API 和自动创建元数据功能，解决标签管理依赖问题
+- fix(id): 修复 IndexedDB 和元数据中图片ID不一致的问题，确保使用正确的ID添加标签
+- refactor(ui): 简化图片保存流程，去除“保存到本地”按钮，点击“保存图片”同时保存到本地和云存储
