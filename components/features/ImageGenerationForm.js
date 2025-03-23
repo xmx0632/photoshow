@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ImageUploader } from './ImageUploader';
+import { saveImage, getAllImages, migrateFromLocalStorage } from '../../lib/indexedDB';
 
 /**
  * 图片生成表单组件
@@ -12,6 +13,7 @@ export function ImageGenerationForm() {
   // 状态管理
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [error, setError] = useState(null);
   const [savedImages, setSavedImages] = useState([]);
@@ -58,36 +60,34 @@ export function ImageGenerationForm() {
   /**
    * 保存图片到本地存储
    */
-  const saveImageLocally = () => {
+  const saveImageLocally = async () => {
     if (!generatedImage) return;
     
     try {
-      // 获取现有保存的图片
-      const savedImagesJson = localStorage.getItem('generatedImages') || '[]';
-      const currentSavedImages = JSON.parse(savedImagesJson);
+      setIsLoading(true);
       
       // 创建新的图片对象
       const newImage = {
         id: Date.now().toString(),
         prompt,
-        imageUrl: generatedImage, // 使用 imageUrl 字段名保持一致
+        imageUrl: generatedImage,
         createdAt: new Date().toISOString(),
       };
       
-      // 添加到保存列表
-      const updatedSavedImages = [newImage, ...currentSavedImages];
+      // 保存到 IndexedDB
+      await saveImage(newImage);
       
-      // 更新本地存储
-      localStorage.setItem('generatedImages', JSON.stringify(updatedSavedImages));
-      
-      // 更新状态
-      setSavedImages(updatedSavedImages);
+      // 重新加载图片列表
+      const images = await getAllImages();
+      setSavedImages(images);
       
       // 显示成功消息
       alert('图片已保存到本地');
     } catch (err) {
       console.error('保存图片失败:', err);
       setError(`保存图片失败: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -105,6 +105,28 @@ export function ImageGenerationForm() {
   const handleUploadError = (errorMessage) => {
     setError(`上传图片失败: ${errorMessage}`);
   };
+  
+  // 当组件加载时获取保存的图片
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        setIsLoading(true);
+        
+        // 尝试从 localStorage 迁移数据到 IndexedDB
+        await migrateFromLocalStorage();
+        
+        // 从 IndexedDB 加载图片
+        const images = await getAllImages();
+        setSavedImages(images);
+      } catch (err) {
+        console.error('加载保存的图片失败:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadImages();
+  }, []);
   
   return (
     <div>
