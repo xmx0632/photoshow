@@ -12,3 +12,4 @@
 - fix(api): 修复Gemini API连接问题，添加超时处理和错误诊断，使用替代方案实现图片生成功能
 - fix(ui): 修复输入框文字颜色问题，确保文字在各种主题模式下可见
 - feat(env): 添加dotenv支持，优化环境变量加载方式，提供环境变量配置示例
+- feat(analytics): 集成Vercel Web Analytics功能，添加访问统计和分析能力

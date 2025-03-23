@@ -103,6 +103,33 @@ curl -s -X POST \
 ```
 
 
+### 部署
+
+集成 vercel 的 Web Analytics 功能
+
+```bash
+我需要集成 vercel 的 Web Analytics 功能，帮我在合适的位置加上集成代码。这是官方例子：import { Analytics } from '@vercel/analytics/next';
+ 
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <title>Next.js</title>
+      </head>
+      <body>
+        {children}
+        <Analytics />
+      </body>
+    </html>
+  );
+}
+```
+
+
 
 ### 发布
 

@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import { Navbar } from '../components/layout/Navbar';
 import { Footer } from '../components/layout/Footer';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata = {
   title: 'PhotoShow - AI图片生成',
@@ -20,6 +21,7 @@ export default function RootLayout({ children }) {
           {children}
         </main>
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
