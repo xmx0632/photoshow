@@ -63,10 +63,45 @@ export default function ManagePage() {
       
       // 如果指定了标签，过滤结果
       if (tag) {
+        console.log(`正在筛选标签: "${tag}"`);
         imagesList = imagesList.filter(image => {
-          const tags = image.metadata?.tags ? JSON.parse(image.metadata.tags) : [];
-          return tags.includes(tag);
+          // 处理不同格式的标签数据
+          let tags = [];
+          
+          if (image.metadata?.tags) {
+            // 如果标签是字符串（JSON格式），尝试解析
+            if (typeof image.metadata.tags === 'string') {
+              try {
+                tags = JSON.parse(image.metadata.tags);
+              } catch (e) {
+                console.warn('解析标签JSON失败:', e, image.metadata.tags);
+                // 如果解析失败但是字符串包含标签，也认为匹配
+                return image.metadata.tags.includes(tag);
+              }
+            } else if (Array.isArray(image.metadata.tags)) {
+              // 如果已经是数组，直接使用
+              tags = image.metadata.tags;
+            }
+          } else if (image.tags) {
+            // 兼容直接在图片对象上的标签
+            if (typeof image.tags === 'string') {
+              try {
+                tags = JSON.parse(image.tags);
+              } catch (e) {
+                console.warn('解析图片标签JSON失败:', e);
+                return image.tags.includes(tag);
+              }
+            } else if (Array.isArray(image.tags)) {
+              tags = image.tags;
+            }
+          }
+          
+          console.log(`图片 ${image.key || image.id} 的标签:`, tags);
+          const hasTag = Array.isArray(tags) && tags.includes(tag);
+          console.log(`图片 ${image.key || image.id} ${hasTag ? '包含' : '不包含'}标签 "${tag}"`);
+          return hasTag;
         });
+        console.log(`筛选后剩余 ${imagesList.length} 张图片`);
       }
       
       setImages(imagesList);
@@ -114,14 +149,18 @@ export default function ManagePage() {
   // 加载标签列表
   const loadTags = async () => {
     try {
-      const response = await fetch('/api/tags');
+      // 从 Supabase 获取标签
+      const response = await fetch('/api/tags-supabase-only');
       
       if (!response.ok) {
         throw new Error('获取标签列表失败');
       }
       
       const data = await response.json();
-      setTags(data.tags || []);
+      const tags = data.tags || [];
+      console.log('从 Supabase 获取到标签:', tags);
+      
+      setTags(tags);
     } catch (err) {
       console.error('加载标签失败:', err);
       setError('加载标签失败: ' + err.message);
@@ -261,8 +300,8 @@ export default function ManagePage() {
         console.warn('检查元数据出错:', metaErr);
       }
       
-      // 添加标签
-      const response = await fetch('/api/tags', {
+      // 仅使用 Supabase 添加标签
+      const response = await fetch('/api/tags-supabase-only', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -270,12 +309,12 @@ export default function ManagePage() {
         body: JSON.stringify({ imageId: effectiveImageId, tag }),
       });
       
-      const result = await response.json();
-      
       if (!response.ok) {
-        throw new Error(result.error || '添加标签失败');
+        const errorData = await response.json();
+        throw new Error(errorData.error || '添加标签失败');
       }
       
+      const result = await response.json();
       console.log('标签添加成功:', result);
       
       // 重新加载图片和标签
@@ -290,7 +329,8 @@ export default function ManagePage() {
   // 移除标签
   const removeTag = async (imageId, tag) => {
     try {
-      const response = await fetch('/api/tags', {
+      // 仅使用 Supabase 删除标签
+      const response = await fetch('/api/tags-supabase-only', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -299,8 +339,12 @@ export default function ManagePage() {
       });
       
       if (!response.ok) {
-        throw new Error('移除标签失败');
+        const errorData = await response.json();
+        throw new Error(errorData.error || '删除标签失败');
       }
+      
+      const result = await response.json();
+      console.log('标签删除成功:', result);
       
       // 重新加载图片和标签
       loadImages(selectedTag);
@@ -327,6 +371,32 @@ export default function ManagePage() {
     } catch (err) {
       console.error('创建备份失败:', err);
       setError('创建备份失败: ' + err.message);
+    }
+  };
+  
+  // 同步图片数据到 Supabase
+  const syncImagesToSupabase = async () => {
+    try {
+      setIsLoading(true);
+      
+      const response = await fetch('/api/images/sync', {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('同步图片到 Supabase 失败');
+      }
+      
+      const data = await response.json();
+      alert(`同步完成: 成功同步 ${data.succeeded}/${data.total} 张图片到 Supabase`);
+      
+      // 重新加载标签
+      loadTags();
+    } catch (err) {
+      console.error('同步图片失败:', err);
+      setError('同步图片失败: ' + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
   
@@ -418,6 +488,12 @@ export default function ManagePage() {
               创建备份
             </button>
             <button 
+              onClick={syncImagesToSupabase}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+            >
+              同步到云端
+            </button>
+            <button 
               onClick={runAutoCleanup}
               className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm"
               disabled={!storageInfo.quota.isWarning}
@@ -492,17 +568,30 @@ export default function ManagePage() {
                   {/* 标签 */}
                   <div className="mt-2 flex flex-wrap gap-1">
                     {image.metadata?.tags ? (
-                      JSON.parse(image.metadata.tags).map((tag) => (
-                        <span key={tag} className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">
-                          {tag}
-                          <button
-                            onClick={() => removeTag(image.key, tag)}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            &times;
-                          </button>
-                        </span>
-                      ))
+                      (() => {
+                        try {
+                          const parsedTags = typeof image.metadata.tags === 'string' 
+                            ? JSON.parse(image.metadata.tags)
+                            : Array.isArray(image.metadata.tags) ? image.metadata.tags : [];
+                          
+                          return parsedTags.length > 0 
+                            ? parsedTags.map((tag) => (
+                                <span key={tag} className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">
+                                  {tag}
+                                  <button
+                                    onClick={() => removeTag(image.key, tag)}
+                                    className="ml-1 text-red-500 hover:text-red-700"
+                                  >
+                                    &times;
+                                  </button>
+                                </span>
+                              ))
+                            : <span className="text-xs text-gray-500">无标签</span>;
+                        } catch (e) {
+                          console.error('解析标签失败:', e, image.metadata.tags);
+                          return <span className="text-xs text-gray-500">标签格式错误</span>;
+                        }
+                      })()
                     ) : (
                       <span className="text-xs text-gray-500">无标签</span>
                     )}
