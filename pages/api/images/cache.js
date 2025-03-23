@@ -2,7 +2,8 @@ import {
   initCache, 
   getCachedImages, 
   isCacheInitialized,
-  syncCache
+  syncCache,
+  getLastUpdated
 } from '../../../lib/cacheService';
 import { listImages } from '../../../lib/cloudflare';
 
@@ -34,13 +35,29 @@ export default async function handler(req, res) {
 }
 
 /**
+ * 检查缓存是否过期
+ * @returns {boolean} 是否过期
+ */
+function isCacheExpired() {
+  const lastUpdated = getLastUpdated();
+  if (!lastUpdated) return true;
+  
+  // 缓存超过5分钟则认为过期
+  const fiveMinutes = 5 * 60 * 1000;
+  return (Date.now() - new Date(lastUpdated).getTime()) > fiveMinutes;
+}
+
+/**
  * 处理获取缓存图片的请求
  */
 async function handleGetCachedImages(req, res) {
-  // 如果缓存未初始化，则先同步缓存
-  if (!isCacheInitialized()) {
+  // 添加缓存控制头，客户端缓存30秒
+  res.setHeader('Cache-Control', 'public, max-age=30');
+  
+  // 如果缓存未初始化或者已过期，则同步缓存
+  if (!isCacheInitialized() || isCacheExpired()) {
     try {
-      console.log('缓存未初始化，正在同步缓存...');
+      console.log('缓存需要更新，正在同步...');
       await syncCacheData();
     } catch (error) {
       console.error('同步缓存失败:', error);
@@ -68,6 +85,9 @@ async function handleSyncCache(req, res) {
     const cachedImages = getCachedImages();
     
     console.log(`缓存同步完成，当前缓存中有 ${cachedImages.length} 张图片`);
+    
+    // 添加缓存控制头
+    res.setHeader('Cache-Control', 'no-cache');
     return res.status(200).json({ 
       success: true, 
       message: '缓存同步成功',
@@ -79,12 +99,24 @@ async function handleSyncCache(req, res) {
   }
 }
 
+// 添加同步锁，防止重复调用
+syncCacheData
+let isSyncing = false;
+
 /**
  * 同步缓存数据
  * 仅从云存储获取图片，并更新缓存
  * 注意：IndexedDB 只能在浏览器中使用，不能在服务端使用
  */
 async function syncCacheData() {
+  // 如果已经在同步中，则等待完成
+  if (isSyncing) {
+    console.log('缓存同步已在进行中，跳过此次请求');
+    return true;
+  }
+  
+  isSyncing = true;
+  
   try {
     // 在服务端不能使用 IndexedDB，所以只从云存储获取图片
     let localImages = [];
@@ -132,5 +164,8 @@ async function syncCacheData() {
   } catch (error) {
     console.error('同步缓存数据失败:', error);
     throw error;
+  } finally {
+    // 无论成功失败，都释放同步锁
+    isSyncing = false;
   }
 }

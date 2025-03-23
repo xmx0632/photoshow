@@ -5,6 +5,11 @@
 
 import supabase from '../../lib/supabase';
 
+// 标签缓存机制
+let tagsCache = null;
+let tagsCacheTime = null;
+const CACHE_TTL = 5 * 60 * 1000; // 缓存时间5分钟
+
 export default async function handler(req, res) {
   try {
     // 根据请求方法处理不同操作
@@ -32,6 +37,17 @@ export default async function handler(req, res) {
  */
 async function handleGetTags(req, res) {
   try {
+    // 添加缓存控制头，客户端缓存30秒
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    
+    // 如果缓存存在且未过期，直接返回缓存数据
+    if (tagsCache && tagsCacheTime && (Date.now() - tagsCacheTime < CACHE_TTL)) {
+      console.log('使用标签缓存，跳过 Supabase 请求');
+      return res.status(200).json({ tags: tagsCache });
+    }
+    
+    console.log('标签缓存过期或不存在，从 Supabase 获取数据');
+    
     // 从 Supabase 获取所有标签
     const { data, error } = await supabase
       .from('tags')
@@ -42,6 +58,11 @@ async function handleGetTags(req, res) {
     
     // 提取标签名称
     const tags = data.map(item => item.tag);
+    
+    // 更新缓存
+    tagsCache = tags;
+    tagsCacheTime = Date.now();
+    console.log(`标签缓存已更新，共 ${tags.length} 个标签`);
     
     return res.status(200).json({ tags });
   } catch (error) {
@@ -60,6 +81,10 @@ async function handleAddTag(req, res) {
   if (!imageId || !tag) {
     return res.status(400).json({ error: '缺少必要参数' });
   }
+  
+  // 添加标签时清除缓存，确保下次获取时能看到新标签
+  tagsCache = null;
+  tagsCacheTime = null;
   
   try {
     // 1. 检查标签是否存在，不存在则创建
@@ -132,6 +157,10 @@ async function handleRemoveTag(req, res) {
   if (!imageId || !tag) {
     return res.status(400).json({ error: '缺少必要参数' });
   }
+  
+  // 删除标签时清除缓存，确保下次获取时能反映变化
+  tagsCache = null;
+  tagsCacheTime = null;
   
   try {
     // 1. 获取标签 ID

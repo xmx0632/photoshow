@@ -39,3 +39,5 @@
 - fix(metadata): 添加元数据 API 和自动创建元数据功能，解决标签管理依赖问题
 - fix(id): 修复 IndexedDB 和元数据中图片ID不一致的问题
 - feat(database): 添加 Supabase 数据库集成，实现图片和标签数据的云存储功能
+- refactor(api): 完全移除 metadata.json 引用，将所有标签和元数据操作重定向到 Supabase
+- fix(manage): 修改图片管理页面，直接使用 Supabase API 添加和删除标签，不再依赖本地元数据文件

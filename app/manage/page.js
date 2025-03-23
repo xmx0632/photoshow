@@ -23,10 +23,17 @@ export default function ManagePage() {
       setIsLoading(true);
       
       // 先尝试使用缓存 API 获取图片
-      let url = '/api/images/cache';
+      // 添加时间戳参数避免浏览器缓存
+      const timestamp = new Date().getTime();
+      let url = `/api/images/cache?_=${timestamp}`;
       
-      // 获取图片列表
-      const response = await fetch(url);
+      // 获取图片列表，添加缓存控制头
+      const response = await fetch(url, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       
       if (!response.ok) {
         throw new Error('获取缓存图片列表失败');
@@ -149,8 +156,14 @@ export default function ManagePage() {
   // 加载标签列表
   const loadTags = async () => {
     try {
-      // 从 Supabase 获取标签
-      const response = await fetch('/api/tags-supabase-only');
+      // 从 Supabase 获取标签，添加时间戳避免浏览器缓存
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/tags-supabase-only?_=${timestamp}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       
       if (!response.ok) {
         throw new Error('获取标签列表失败');
@@ -170,7 +183,14 @@ export default function ManagePage() {
   // 加载存储信息
   const loadStorageInfo = async () => {
     try {
-      const response = await fetch('/api/storage');
+      // 添加时间戳避免浏览器缓存
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/storage?_=${timestamp}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       
       if (!response.ok) {
         throw new Error('获取存储信息失败');
@@ -261,44 +281,8 @@ export default function ManagePage() {
       
       console.log('使用有效图片ID:', effectiveImageId);
       
-      // 检查元数据文件中是否已存在该ID
-      try {
-        const checkResponse = await fetch(`/api/metadata?id=${encodeURIComponent(effectiveImageId)}`);
-        const checkResult = await checkResponse.json();
-        
-        // 如果元数据不存在，则创建它
-        if (!checkResponse.ok || !checkResult.metadata) {
-          console.log('元数据不存在，创建新的元数据');
-          
-          // 收集图片元数据
-          const imageMetadata = {
-            id: effectiveImageId,
-            url: image.url,
-            prompt: image.metadata?.prompt || '',
-            createdAt: image.lastModified || new Date().toISOString(),
-            tags: []
-          };
-          
-          // 保存元数据
-          const saveResponse = await fetch('/api/metadata', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ metadata: imageMetadata }),
-          });
-          
-          if (!saveResponse.ok) {
-            console.warn('保存元数据失败，但仍尝试添加标签');
-          } else {
-            console.log('元数据保存成功');
-          }
-        } else {
-          console.log('元数据已存在，直接添加标签');
-        }
-      } catch (metaErr) {
-        console.warn('检查元数据出错:', metaErr);
-      }
+      // 直接使用 Supabase 添加标签，不再检查本地元数据文件
+      console.log('直接使用 Supabase 添加标签，图片ID:', effectiveImageId);
       
       // 仅使用 Supabase 添加标签
       const response = await fetch('/api/tags-supabase-only', {
@@ -439,9 +423,36 @@ export default function ManagePage() {
   
   // 初始加载
   useEffect(() => {
-    loadImages();
-    loadTags();
-    loadStorageInfo();
+    // 使用独立的加载函数，避免重复请求
+    const initialLoad = async () => {
+      try {
+        setIsLoading(true);
+        
+        // 并行请求，减少总加载时间
+        await Promise.all([
+          loadImages(),
+          loadTags(),
+          loadStorageInfo()
+        ]);
+        
+        console.log('所有数据加载完成');
+      } catch (error) {
+        console.error('初始加载数据失败:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    initialLoad();
+    
+    // 添加定时刷新机制，每5分钟自动更新一次存储信息
+    const refreshInterval = setInterval(() => {
+      console.log('定时刷新存储信息...');
+      loadStorageInfo();
+    }, 5 * 60 * 1000); // 5分钟
+    
+    // 组件卸载时清除定时器
+    return () => clearInterval(refreshInterval);
   }, []);
   
   return (
