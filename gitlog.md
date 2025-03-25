@@ -2,6 +2,14 @@
 
 ## 未提交更改
 
+- feat(env): 将缓存过期时间(CACHE_TTL)改为可配置的环境变量
+- refactor(ui): 移除管理页面中的“创建备份”功能
+- refactor(api): 删除备份功能的后端 API 和相关实现
+- fix(cache): 优化Redis缓存更新机制，添加重试机制和详细日志
+- refactor(upload): 重构图片上传API，移除重复代码并使用辅助函数提高可维护性
+- fix(model): 优化图片数据模型，只保留imageUrl属性避免重复存储相同URL
+- fix(client): 移除客户端对/api/images/cache接口的多余调用，由服务端自动处理缓存更新
+
 - feat(cache): 实现图片增量缓存更新，新增和删除图片时自动更新缓存而非全量同步
 - fix(cache): 修复 Redis 缓存服务中图片对象无效导致的错误
 - fix(config): 修复缓存类型配置未正确加载的问题

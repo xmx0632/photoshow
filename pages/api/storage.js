@@ -9,6 +9,9 @@ import { getBucketUsage, listImages, deleteImage } from '../../lib/cloudflare';
 const STORAGE_QUOTA_MB = parseInt(process.env.STORAGE_QUOTA_MB || 5120);
 // 警告阈值（默认 80%）
 const WARNING_THRESHOLD = parseFloat(process.env.WARNING_THRESHOLD || 0.8);
+// 客户端缓存时间（默认值）
+const CLIENT_CACHE_SHORT = parseInt(process.env.CLIENT_CACHE_SHORT || 60); // 短期缓存，默认 60 秒
+const CLIENT_CACHE_LONG = parseInt(process.env.CLIENT_CACHE_LONG || 300); // 长期缓存，默认 5 分钟
 
 export default async function handler(req, res) {
   try {
@@ -31,14 +34,33 @@ export default async function handler(req, res) {
 
 /**
  * 处理获取存储使用情况请求
+ * 优化版本：添加缓存控制和性能指标
  */
 async function handleGetStorageUsage(req, res) {
+  const requestStartTime = Date.now();
+  
+  // 检查是否要强制刷新缓存
+  const forceRefresh = req.query.refresh === 'true';
+  
   // 获取存储使用情况
-  const usage = await getBucketUsage();
+  const usage = await getBucketUsage(forceRefresh);
   
   // 计算使用百分比
   const usagePercentage = (usage.totalSizeMB / STORAGE_QUOTA_MB) * 100;
   const isWarning = usagePercentage >= WARNING_THRESHOLD * 100;
+  
+  // 添加缓存控制头
+  // 使用环境变量中配置的缓存时间
+  if (usage.fromCache) {
+    // 如果数据来自缓存，使用短期缓存
+    res.setHeader('Cache-Control', `public, max-age=${CLIENT_CACHE_SHORT}`);
+  } else {
+    // 如果是新获取的数据，使用长期缓存
+    res.setHeader('Cache-Control', `public, max-age=${CLIENT_CACHE_LONG}`);
+  }
+  
+  // 计算请求总耗时
+  const requestTime = Date.now() - requestStartTime;
   
   return res.status(200).json({
     usage,
@@ -48,6 +70,11 @@ async function handleGetStorageUsage(req, res) {
       availableMB: STORAGE_QUOTA_MB - usage.totalSizeMB,
       usagePercentage,
       isWarning,
+    },
+    performance: {
+      requestTime,
+      fromCache: usage.fromCache || false,
+      queryTime: usage.queryTime || 0
     },
     timestamp: new Date().toISOString(),
   });

@@ -14,10 +14,18 @@ export function ImageUploader({ imageData, prompt, onUploadComplete, onUploadErr
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
   
+  // 当imageData变化时，重置uploadedImageUrl状态
+  // 这确保每次有新图片生成时，都会显示"保存图片"按钮
+  useEffect(() => {
+    if (imageData) {
+      setUploadedImageUrl(null);
+    }
+  }, [imageData]);
+  
   /**
    * 上传图片到 R2 存储，并保存到本地 IndexedDB
    */
-  const uploadImage = async () => {
+  const saveLocalFileAndUploadImage = async () => {
     if (!imageData) {
       onUploadError?.('没有可上传的图片');
       return;
@@ -126,18 +134,8 @@ export function ImageUploader({ imageData, prompt, onUploadComplete, onUploadErr
               uploadedAt: new Date().toISOString()
             });
             
-            // 同步缓存
-            try {
-              await fetch('/api/images/cache', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              });
-              console.log('上传图片后缓存同步成功');
-            } catch (syncError) {
-              console.warn('缓存同步失败:', syncError);
-            }
+            // 服务端的 /api/upload 接口已经处理了缓存更新，不需要客户端再调用 /api/images/cache 接口
+            console.log('图片上传成功，服务端已自动更新缓存');
             
             console.log('图片云存储信息已更新到本地');
           } else {
@@ -165,7 +163,7 @@ export function ImageUploader({ imageData, prompt, onUploadComplete, onUploadErr
     <div className="mt-4">
       {imageData && !uploadedImageUrl && (
         <button
-          onClick={uploadImage}
+          onClick={saveLocalFileAndUploadImage}
           disabled={isUploading}
           className={`w-full py-2 px-4 rounded-md text-white font-medium ${
             isUploading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'

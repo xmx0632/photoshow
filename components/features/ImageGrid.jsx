@@ -174,17 +174,31 @@ export function ImageGrid({ showDeleteButton = false, isAdminView = false }) {
    */
   const handleDelete = async (imageId) => {
     try {
+      // 显示删除中状态
+      setIsLoading(true);
       const imageToDelete = images.find(img => img.id === imageId);
       
       if (imageToDelete) {
-        // 如果是云存储图片，调用云存储删除 API
+        // 如果是云存储图片，调用后端统一删除 API
         if (imageToDelete.isCloudImage) {
           try {
-            await fetch(`/api/images?fileName=${encodeURIComponent(imageId)}`, {
+            const response = await fetch(`/api/images?fileName=${encodeURIComponent(imageId)}`, {
               method: 'DELETE',
             });
+            
+            const result = await response.json();
+            console.log('删除图片结果:', result);
+            
+            // 即使是云存储图片，也需要从 IndexedDB 中删除本地记录
+            try {
+              await deleteImage(imageId);
+              console.log('从本地数据库删除图片成功:', imageId);
+            } catch (localError) {
+              console.warn('从本地数据库删除图片失败:', localError);
+            }
           } catch (cloudError) {
             console.error('从云存储删除图片失败:', cloudError);
+            throw cloudError; // 向上抛出错误，不更新前端状态
           }
         } else {
           // 从 IndexedDB 中删除本地图片
@@ -192,23 +206,16 @@ export function ImageGrid({ showDeleteButton = false, isAdminView = false }) {
         }
       }
       
-      // 更新状态
+      // 更新前端状态
       setImages(prevImages => prevImages.filter(image => image.id !== imageId));
       
-      // 同步缓存
-      try {
-        await fetch('/api/images/cache', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        console.log('删除图片后缓存同步成功');
-      } catch (syncError) {
-        console.warn('缓存同步失败:', syncError);
-      }
+      // 注意：不再需要额外调用缓存同步 API，因为后端已统一处理
     } catch (error) {
       console.error('删除图片失败:', error);
+      // 显示错误提示
+      toast.error(`删除图片失败: ${error.message || '未知错误'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 

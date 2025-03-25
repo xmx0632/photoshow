@@ -344,24 +344,7 @@ export default function ManagePage() {
     }
   };
   
-  // 创建备份
-  const createBackup = async () => {
-    try {
-      const response = await fetch('/api/backup', {
-        method: 'POST',
-      });
-      
-      if (!response.ok) {
-        throw new Error('创建备份失败');
-      }
-      
-      const data = await response.json();
-      alert(`备份创建成功: ${data.backupFile}`);
-    } catch (err) {
-      console.error('创建备份失败:', err);
-      setError('创建备份失败: ' + err.message);
-    }
-  };
+  // 创建备份功能已移除
   
   // 同步图片数据到 Supabase
   const syncImagesToSupabase = async () => {
@@ -547,12 +530,6 @@ export default function ManagePage() {
             ({storageInfo.usage.objectCount} 个文件)
           </p>
           <div className="mt-3 flex space-x-2">
-            <button 
-              onClick={createBackup}
-              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
-            >
-              创建备份
-            </button>
             <button 
               onClick={syncImagesToSupabase}
               className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"

@@ -6,6 +6,7 @@
 import { uploadImage } from '../../lib/cloudflare';
 import { addImageToCache } from '../../lib/cacheManager';
 import { normalizeImageData } from '../../lib/imageDataModel';
+import { syncImageMetadataToSupabase } from '../../lib/supabaseService';
 import fs from 'fs';
 import { IncomingForm } from 'formidable';
 
@@ -22,6 +23,58 @@ export const config = {
  * 1. Base64 编码的图片数据
  * 2. 表单文件上传
  */
+/**
+ * 将上传的图片添加到缓存并同步到Supabase
+ * 包含重试机制和错误处理
+ * @param {Object} result - 上传图片的结果对象
+ */
+async function addImageToCacheWithRetry(result) {
+  try {
+    // 使用标准化的图片数据模型 - 只保留imageUrl属性
+    const imageForCache = normalizeImageData({
+      id: result.fileName,
+      imageUrl: result.url, // 只使用imageUrl属性
+      prompt: result.metadata.prompt || '',
+      createdAt: result.metadata.createdAt || new Date().toISOString(),
+      ...result.metadata
+    });
+    
+    // 添加Redis缓存更新的重试机制
+    let cacheSuccess = false;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!cacheSuccess && retryCount < maxRetries) {
+      try {
+        console.log(`尝试将图片添加到Redis缓存 [尝试${retryCount + 1}/${maxRetries}]: ${imageForCache.id}`);
+        await addImageToCache(imageForCache);
+        cacheSuccess = true;
+        console.log(`新上传的图片已成功添加到Redis缓存: ${imageForCache.id}`);
+      } catch (err) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          console.warn(`Redis缓存更新失败，准备重试 ${retryCount}/${maxRetries}: ${err.message}`);
+          // 等待一小段时间再重试
+          await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+        } else {
+          console.error(`添加图片到Redis缓存失败，已达到最大重试次数: ${err.message}`);
+          throw err; // 重新抛出错误，让外层catch捕获
+        }
+      }
+    }
+    
+    // 同步到 Supabase 数据库
+    try {
+      await syncImageMetadataToSupabase(imageForCache);
+      console.log(`新上传的图片已同步到 Supabase 数据库: ${imageForCache.id}`);
+    } catch (supabaseError) {
+      console.warn(`同步图片到 Supabase 数据库失败: ${supabaseError.message}`);
+    }
+  } catch (cacheError) {
+    console.error(`添加图片到缓存失败: ${cacheError.message}`);
+  }
+}
+
 export default async function handler(req, res) {
   try {
     // 只允许 POST 请求
@@ -64,22 +117,7 @@ export default async function handler(req, res) {
       const result = await uploadImage(imageUrl, prompt || '', { ...metadata, fileName });
       
       // 将新上传的图片添加到缓存
-      try {
-        // 使用标准化的图片数据模型
-        const imageForCache = normalizeImageData({
-          id: result.fileName,
-          url: result.url,
-          publicUrl: result.publicUrl,
-          prompt: result.metadata.prompt || '',
-          createdAt: result.metadata.createdAt || new Date().toISOString(),
-          ...result.metadata
-        });
-        
-        await addImageToCache(imageForCache);
-        console.log(`新上传的图片已添加到缓存: ${imageForCache.id}`);
-      } catch (cacheError) {
-        console.warn(`添加图片到缓存失败: ${cacheError.message}`);
-      }
+      await addImageToCacheWithRetry(result);
       
       return res.status(200).json(result);
     }
@@ -119,22 +157,7 @@ export default async function handler(req, res) {
       const result = await uploadImage(fileData, prompt, metadata);
 
       // 将新上传的图片添加到缓存
-      try {
-        // 使用标准化的图片数据模型
-        const imageForCache = normalizeImageData({
-          id: result.fileName,
-          url: result.url,
-          publicUrl: result.publicUrl,
-          prompt: result.metadata.prompt || '',
-          createdAt: result.metadata.createdAt || new Date().toISOString(),
-          ...result.metadata
-        });
-        
-        await addImageToCache(imageForCache);
-        console.log(`新上传的图片已添加到缓存: ${imageForCache.id}`);
-      } catch (cacheError) {
-        console.warn(`添加图片到缓存失败: ${cacheError.message}`);
-      }
+      await addImageToCacheWithRetry(result);
 
       // 删除临时文件
       fs.unlinkSync(file.filepath);
