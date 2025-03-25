@@ -1,4 +1,5 @@
 import { generateImage } from '../../../lib/gemini';
+import { checkGenerationLimit, incrementGenerationCount } from '../../../lib/generationLimitService';
 
 /**
  * 处理图片生成API请求
@@ -19,12 +20,37 @@ export async function POST(request) {
       );
     }
     
+    // 检查每日生成限制
+    const generationStatus = await checkGenerationLimit();
+    if (generationStatus.isLimitExceeded) {
+      return new Response(
+        JSON.stringify({ 
+          error: '超过每日图片生成限制',
+          limit: generationStatus.limit,
+          currentCount: generationStatus.currentCount,
+          remaining: 0
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // 调用Gemini API生成图片
     const imageUrl = await generateImage(prompt);
     
-    // 返回成功响应
+    // 生成成功后增加计数
+    await incrementGenerationCount();
+    
+    // 获取更新后的生成限制信息
+    const updatedLimitInfo = await checkGenerationLimit();
+    
+    // 返回成功响应，包含剩余生成次数信息
     return new Response(
-      JSON.stringify({ imageUrl }),
+      JSON.stringify({ 
+        imageUrl,
+        limit: updatedLimitInfo.limit,
+        currentCount: updatedLimitInfo.currentCount,
+        remaining: updatedLimitInfo.remaining
+      }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
