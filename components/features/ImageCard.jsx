@@ -27,7 +27,7 @@ export function ImageCard({ image, onDelete, showDeleteButton = true }) {
       {/* 图片预览 */}
       <div className="relative aspect-w-1 aspect-h-1">
         <img
-          src={image.imageUrl}
+          src={image.imageUrl || image.url}
           alt={image.prompt}
           className="object-cover w-full h-full"
           loading="lazy"
@@ -47,7 +47,7 @@ export function ImageCard({ image, onDelete, showDeleteButton = true }) {
         {/* 操作按钮 */}
         <div className={`flex ${showDeleteButton ? 'justify-between' : 'justify-end'} mt-2`}>
           <a
-            href={image.imageUrl}
+            href={image.imageUrl || image.url}
             download="generated-image.png"
             target="_blank"
             rel="noopener noreferrer"

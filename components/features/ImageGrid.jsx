@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ImageCard } from './ImageCard';
 import { getAllImages, deleteImage, getStorageUsage } from '../../lib/indexedDB';
+import { normalizeImageArray } from '../../lib/imageDataModel';
 
 /**
  * 图片网格组件
@@ -32,7 +33,10 @@ export function ImageGrid({ showDeleteButton = false, isAdminView = false }) {
               const cacheData = await cacheResponse.json();
               if (cacheData.success && cacheData.images && cacheData.images.length > 0) {
                 console.log(`从缓存获取到 ${cacheData.images.length} 张图片`);
-                setImages(cacheData.images);
+                
+                // 使用标准化的图片数据模型
+                const formattedImages = normalizeImageArray(cacheData.images);
+                setImages(formattedImages);
                 
                 // 检查存储空间使用情况
                 const usage = await getStorageUsage();
@@ -64,16 +68,16 @@ export function ImageGrid({ showDeleteButton = false, isAdminView = false }) {
               const data = await response.json();
               cloudImages = data.images || [];
               
-              // 将云存储图片转换为与本地图片相同的格式
-              cloudImages = cloudImages.map(img => ({
+              // 使用标准化的图片数据模型处理云存储图片
+              cloudImages = normalizeImageArray(cloudImages.map(img => ({
                 id: img.key,
+                url: img.url,
                 prompt: img.metadata?.prompt || '无提示词',
-                imageUrl: img.url,
                 createdAt: img.lastModified || new Date().toISOString(),
-                isCloudImage: true, // 标记为云存储图片
+                isCloudImage: true,
                 cloudFileName: img.key,
-                fileName: img.key // 也将云存储文件名作为本地文件名，便于去重
-              }));
+                metadata: img.metadata
+              })));
             }
           } catch (cloudError) {
             console.error('加载云存储图片失败:', cloudError);

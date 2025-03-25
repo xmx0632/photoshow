@@ -4,6 +4,8 @@
  */
 
 import { uploadImage } from '../../lib/cloudflare';
+import { addImageToCache } from '../../lib/cacheManager';
+import { normalizeImageData } from '../../lib/imageDataModel';
 import fs from 'fs';
 import { IncomingForm } from 'formidable';
 
@@ -60,6 +62,25 @@ export default async function handler(req, res) {
       // 如果客户端提供了文件名，使用客户端的文件名保持一致性
       const fileName = metadata?.fileName || null;
       const result = await uploadImage(imageUrl, prompt || '', { ...metadata, fileName });
+      
+      // 将新上传的图片添加到缓存
+      try {
+        // 使用标准化的图片数据模型
+        const imageForCache = normalizeImageData({
+          id: result.fileName,
+          url: result.url,
+          publicUrl: result.publicUrl,
+          prompt: result.metadata.prompt || '',
+          createdAt: result.metadata.createdAt || new Date().toISOString(),
+          ...result.metadata
+        });
+        
+        await addImageToCache(imageForCache);
+        console.log(`新上传的图片已添加到缓存: ${imageForCache.id}`);
+      } catch (cacheError) {
+        console.warn(`添加图片到缓存失败: ${cacheError.message}`);
+      }
+      
       return res.status(200).json(result);
     }
     // 处理表单请求（文件上传）
@@ -96,6 +117,24 @@ export default async function handler(req, res) {
 
       // 上传图片
       const result = await uploadImage(fileData, prompt, metadata);
+
+      // 将新上传的图片添加到缓存
+      try {
+        // 使用标准化的图片数据模型
+        const imageForCache = normalizeImageData({
+          id: result.fileName,
+          url: result.url,
+          publicUrl: result.publicUrl,
+          prompt: result.metadata.prompt || '',
+          createdAt: result.metadata.createdAt || new Date().toISOString(),
+          ...result.metadata
+        });
+        
+        await addImageToCache(imageForCache);
+        console.log(`新上传的图片已添加到缓存: ${imageForCache.id}`);
+      } catch (cacheError) {
+        console.warn(`添加图片到缓存失败: ${cacheError.message}`);
+      }
 
       // 删除临时文件
       fs.unlinkSync(file.filepath);

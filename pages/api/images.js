@@ -4,6 +4,8 @@
  */
 
 import { listImages, deleteImage, getBucketUsage } from '../../lib/cloudflare';
+import { removeImageFromCache } from '../../lib/cacheManager';
+import { normalizeImageArray } from '../../lib/imageDataModel';
 
 export default async function handler(req, res) {
   try {
@@ -46,6 +48,10 @@ async function handleGetImages(req, res) {
     result.count = result.images.length;
   }
   
+  // 使用标准化的图片数据模型处理返回的图片数组
+  result.images = normalizeImageArray(result.images);
+  result.count = result.images.length;
+  
   return res.status(200).json(result);
 }
 
@@ -63,6 +69,14 @@ async function handleDeleteImage(req, res) {
   try {
     // 删除云存储中的图片
     const cloudResult = await deleteImage(fileName);
+    
+    // 从缓存中删除图片
+    try {
+      await removeImageFromCache(fileName);
+      console.log(`缓存中的图片删除成功: ${fileName}`);
+    } catch (cacheError) {
+      console.warn(`缓存中的图片删除失败: ${cacheError.message}`);
+    }
     
     // 尝试删除本地 IndexedDB 中的图片
     try {
