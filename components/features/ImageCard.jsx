@@ -33,17 +33,17 @@ export function ImageCard({ image, onDelete, showDeleteButton = true }) {
           loading="lazy"
         />
       </div>
-      
+
       {/* 图片信息 */}
       <div className="p-4">
-        <h3 className="text-lg font-medium line-clamp-1 mb-2" title={image.prompt}>
+        <h3 className="text-sm line-clamp-1 mb-2 text-gray-900 dark:text-gray-100" title={image.prompt}>
           {image.prompt}
         </h3>
-        
+
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
           {formatDate(image.createdAt)}
         </p>
-        
+
         {/* 操作按钮 */}
         <div className={`flex ${showDeleteButton ? 'justify-between' : 'justify-end'} mt-2`}>
           <a
@@ -55,7 +55,7 @@ export function ImageCard({ image, onDelete, showDeleteButton = true }) {
           >
             下载
           </a>
-          
+
           {showDeleteButton && (
             <button
               onClick={() => onDelete(image.id)}
