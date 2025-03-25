@@ -17,6 +17,10 @@ export function ImageGenerationForm() {
   const [generatedImage, setGeneratedImage] = useState(null);
   const [error, setError] = useState(null);
   const [savedImages, setSavedImages] = useState([]);
+  // 每日生成限制相关状态
+  const [generationLimit, setGenerationLimit] = useState(50); // 默认值
+  const [generationCount, setGenerationCount] = useState(0);
+  const [remainingGenerations, setRemainingGenerations] = useState(50);
   
   /**
    * 生成图片
@@ -40,12 +44,23 @@ export function ImageGenerationForm() {
         body: JSON.stringify({ prompt: prompt.trim() }),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '生成图片失败');
+      const data = await response.json();
+      
+      // 处理每日生成限制信息
+      if (data.limit) {
+        setGenerationLimit(data.limit);
+        setGenerationCount(data.currentCount || 0);
+        setRemainingGenerations(data.remaining || 0);
       }
       
-      const data = await response.json();
+      if (!response.ok) {
+        // 如果是超过每日限制的错误
+        if (response.status === 429) {
+          throw new Error(`超过每日图片生成限制 (每日最多 ${data.limit} 张)`);
+        } else {
+          throw new Error(data.error || '生成图片失败');
+        }
+      }
       
       // 设置生成的图片
       setGeneratedImage(data.imageUrl);
@@ -110,6 +125,16 @@ export function ImageGenerationForm() {
         </div>
       )}
       
+      {/* 每日生成限制提示 */}
+      <div className="mb-4 flex justify-between items-center">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          每日限制: {generationLimit} 张
+        </div>
+        <div className={`text-sm ${remainingGenerations > 5 ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+          剩余: {remainingGenerations} 张
+        </div>
+      </div>
+      
       {/* 提示词输入 */}
       <div className="mb-4">
         <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -128,14 +153,15 @@ export function ImageGenerationForm() {
       {/* 生成按钮 */}
       <button
         onClick={generateImage}
-        disabled={isGenerating || !prompt.trim()}
+        disabled={isGenerating || !prompt.trim() || remainingGenerations <= 0}
         className={`w-full py-2 px-4 rounded-md text-white font-medium ${
-          isGenerating || !prompt.trim() 
+          isGenerating || !prompt.trim() || remainingGenerations <= 0
             ? 'bg-gray-400 cursor-not-allowed' 
             : 'bg-blue-600 hover:bg-blue-700'
         }`}
       >
-        {isGenerating ? '生成中...' : '生成图片'}
+        {isGenerating ? '生成中...' : 
+         remainingGenerations <= 0 ? '今日生成次数已用完' : '生成图片'}
       </button>
       
       {/* 生成的图片 */}

@@ -5,6 +5,8 @@
 - feat(env): 将缓存过期时间(CACHE_TTL)改为可配置的环境变量
 - refactor(ui): 移除管理页面中的“创建备份”功能
 - refactor(api): 删除备份功能的后端 API 和相关实现
+- feat(limit): 添加每日图片生成数量限制功能
+- feat(cache): 使用 Redis 存储每日图片生成次数，并设置 2 天的 TTL 自动清理
 - fix(cache): 优化Redis缓存更新机制，添加重试机制和详细日志
 - refactor(upload): 重构图片上传API，移除重复代码并使用辅助函数提高可维护性
 - fix(model): 优化图片数据模型，只保留imageUrl属性避免重复存储相同URL
