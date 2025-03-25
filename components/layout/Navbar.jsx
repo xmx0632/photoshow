@@ -1,7 +1,8 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { isAuthenticated, logout } from '../../lib/auth';
 
 /**
  * 导航栏组件
@@ -10,10 +11,53 @@ import { useState } from 'react';
 export function Navbar() {
   // 移动端菜单开关状态
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // 管理员认证状态
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // 切换移动端菜单显示状态
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+  
+  // 检查管理员认证状态
+  useEffect(() => {
+    // 初始检查认证状态
+    setIsAdmin(isAuthenticated());
+    
+    // 监听存储变化，以便在其他标签页登录/登出时更新状态
+    const handleStorageChange = (e) => {
+      // 当存储中的认证信息变化时更新状态
+      if (e && (e.key === 'photoshow_admin_token' || e.key === 'photoshow_admin_expires' || e.key === null)) {
+        setIsAdmin(isAuthenticated());
+      }
+    };
+    
+    // 使用自定义事件来同步不同组件之间的认证状态
+    const handleAuthEvent = () => {
+      setIsAdmin(isAuthenticated());
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('auth_state_changed', handleAuthEvent);
+    
+    // 定期检查认证状态，以处理令牌过期情况
+    const interval = setInterval(() => {
+      setIsAdmin(isAuthenticated());
+    }, 60000); // 每分钟检查一次
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('auth_state_changed', handleAuthEvent);
+      clearInterval(interval);
+    };
+  }, []);
+  
+  // 处理登出
+  const handleLogout = () => {
+    logout();
+    setIsAdmin(false);
+    // 触发自定义事件通知其他组件认证状态已变化
+    window.dispatchEvent(new Event('auth_state_changed'));
   };
 
   return (
@@ -38,9 +82,19 @@ export function Navbar() {
             <Link href="/browse" className="px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
               浏览图库
             </Link>
-            <Link href="/manage" className="px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
-              图片管理
-            </Link>
+            {isAdmin && (
+              <>
+                <Link href="/manage" className="px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                  图片管理
+                </Link>
+                <button 
+                  onClick={handleLogout}
+                  className="px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+                >
+                  退出登录
+                </button>
+              </>
+            )}
           </div>
           
           {/* 移动端菜单按钮 */}
@@ -100,9 +154,19 @@ export function Navbar() {
           <Link href="/browse" className="block px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
             浏览图库
           </Link>
-          <Link href="/manage" className="block px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-            图片管理
-          </Link>
+          {isAdmin && (
+            <>
+              <Link href="/manage" className="block px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                图片管理
+              </Link>
+              <button 
+                onClick={handleLogout}
+                className="block w-full text-left px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                退出登录
+              </button>
+            </>
+          )}
         </div>
       </div>
     </nav>

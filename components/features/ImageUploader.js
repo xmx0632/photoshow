@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { saveImage, updateImageCloudInfo, getAllImages } from '../../lib/indexedDB';
+import { isAuthenticated } from '../../lib/auth';
 
 /**
  * 图片上传组件
@@ -199,10 +200,10 @@ export function ImageUploader({ imageData, prompt, onUploadComplete, onUploadErr
               查看图片
             </a>
             <a
-              href="/manage"
+              href="/browse"
               className="text-blue-600 hover:underline"
             >
-              管理所有图片
+              浏览图库
             </a>
           </div>
         </div>

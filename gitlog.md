@@ -2,6 +2,11 @@
 
 ## 未提交更改
 
+- fix(ui): 修改图片生成成功后的链接，将“管理所有图片”替换为“浏览图库”
+- feat(security): 修改浏览图库页面，移除删除按钮，只允许下载图片
+- feat(auth): 修复管理员登录状态同步问题，将退出按钮移至导航栏
+- fix(ui): 修复登录后顶部菜单不立即更新的问题，实现自定义事件通知机制
+- fix(auth): 修复isAuthenticated命名冲突导致的运行时错误
 - docs(design): 修改设计文档，优化为MVP快速开发版本，使用NextJS和Tailwind CSS，集成Gemini API
 - docs(prompt): 完善开发提示词文档，为各个迭代阶段添加详细的开发指南
 - feat(init): 初始Next.js项目，配置Tailwind CSS和项目结构
@@ -25,6 +30,10 @@
 - fix(api): 修复图片上传API错误，添加手动解析JSON请求体的逻辑，统一字段名称
 - feat(storage): 使用 IndexedDB 替代 localStorage 保存图片，支持更大存储空间并自动清理旧图片
 - fix(ui): 修复浏览图库中显示重复图片的问题，优先显示本地缓存图片
+- feat(cache): 实现缓存系统的灵活切换，支持文件系统和 Redis 两种缓存方式
+- feat(admin): 添加缓存配置组件，允许管理员在界面中切换缓存类型
+- feat(api): 添加缓存类型配置 API，支持获取和设置缓存类型
+- docs(env): 更新环境变量配置示例，添加缓存和 Redis 相关配置
 - fix(storage): 修复先上传图片再保存导致浏览图库中重复显示的问题
 - fix(storage): 修复 IndexedDB 中同一张图片使用不同 ID 重复保存的问题
 - feat(cache): 添加服务端图片列表缓存功能，加速页面响应速度并确保数据一致性

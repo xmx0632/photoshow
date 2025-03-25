@@ -7,8 +7,12 @@ import { getAllImages, deleteImage, getStorageUsage } from '../../lib/indexedDB'
 /**
  * 图片网格组件
  * 用于展示所有生成的图片
+ * 
+ * @param {Object} props - 组件属性
+ * @param {boolean} props.showDeleteButton - 是否显示删除按钮，默认为 false
+ * @param {boolean} props.isAdminView - 是否为管理员视图，默认为 false
  */
-export function ImageGrid() {
+export function ImageGrid({ showDeleteButton = false, isAdminView = false }) {
   // 状态管理
   const [images, setImages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -235,6 +239,7 @@ export function ImageGrid() {
           key={image.id}
           image={image}
           onDelete={handleDelete}
+          showDeleteButton={showDeleteButton}
         />
       ))}
     </div>

@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { isAuthenticated as checkIsAuthenticated, logout } from '../../lib/auth';
+import { AdminLogin } from '../../components/features/AdminLogin';
+import { CacheConfig } from '../../components/admin/CacheConfig';
 
 /**
  * 图片管理页面
@@ -16,6 +19,8 @@ export default function ManagePage() {
   const [storageInfo, setStorageInfo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // 加载图片列表
   const loadImages = async (tag = '') => {
@@ -421,8 +426,35 @@ export default function ManagePage() {
     loadImages(tag);
   };
   
-  // 初始加载
+  // 检查管理员认证状态
   useEffect(() => {
+    const checkAuth = () => {
+      setIsAdmin(checkIsAuthenticated());
+      setIsCheckingAuth(false);
+    };
+    
+    checkAuth();
+    
+    // 监听存储变化，以便在其他标签页登录/登出时更新状态
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+  
+  // 初始加载数据（仅在认证成功后）
+  useEffect(() => {
+    // 如果正在检查认证状态，不执行任何操作
+    if (isCheckingAuth) return;
+    
+    // 如果未认证，不加载数据
+    if (!isAdmin) return;
+    
     // 使用独立的加载函数，避免重复请求
     const initialLoad = async () => {
       try {
@@ -453,11 +485,34 @@ export default function ManagePage() {
     
     // 组件卸载时清除定时器
     return () => clearInterval(refreshInterval);
-  }, []);
+  }, [isAdmin, isCheckingAuth]);
+  
+  // 处理登录成功
+  const handleLoginSuccess = () => {
+    setIsAdmin(true);
+    // 触发自定义事件通知其他组件认证状态已变化
+    window.dispatchEvent(new Event('auth_state_changed'));
+  };
   
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">图片管理</h1>
+      
+      {/* 认证检查 */}
+      {isCheckingAuth ? (
+        <div className="text-center py-10">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="mt-2">检查认证状态...</p>
+        </div>
+      ) : !isAdmin ? (
+        <div>
+          <p className="mb-6 text-center text-gray-700 dark:text-gray-300">
+            此页面需要管理员权限才能访问。请输入管理员密码登录。
+          </p>
+          <AdminLogin onLoginSuccess={handleLoginSuccess} />
+        </div>
+      ) : (
+        <>
       
       {/* 错误提示 */}
       {error && (
@@ -544,6 +599,9 @@ export default function ManagePage() {
       {/* 图片列表 */}
       <div>
         <h2 className="text-xl font-semibold mb-4">图片列表 ({images.length})</h2>
+        
+        {/* 缓存配置组件 */}
+        <CacheConfig />
         
         {isLoading ? (
           <div className="text-center py-10">
@@ -653,6 +711,9 @@ export default function ManagePage() {
           </div>
         )}
       </div>
+      {/* 已将退出按钮移至导航栏 */}
+        </>
+      )}
     </div>
   );
 }

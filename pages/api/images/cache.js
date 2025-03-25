@@ -3,8 +3,9 @@ import {
   getCachedImages, 
   isCacheInitialized,
   syncCache,
-  getLastUpdated
-} from '../../../lib/cacheService';
+  getLastUpdated,
+  getCurrentCacheType
+} from '../../../lib/cacheManager';
 import { listImages } from '../../../lib/cloudflare';
 
 /**
@@ -36,15 +37,19 @@ export default async function handler(req, res) {
 
 /**
  * 检查缓存是否过期
- * @returns {boolean} 是否过期
+ * @returns {Promise<boolean>} 是否过期
  */
-function isCacheExpired() {
-  const lastUpdated = getLastUpdated();
+async function isCacheExpired() {
+  const lastUpdated = await getLastUpdated();
   if (!lastUpdated) return true;
   
   // 缓存超过5分钟则认为过期
   const fiveMinutes = 5 * 60 * 1000;
-  return (Date.now() - new Date(lastUpdated).getTime()) > fiveMinutes;
+  const lastUpdatedTime = typeof lastUpdated === 'string' 
+    ? new Date(lastUpdated).getTime() 
+    : lastUpdated.getTime();
+    
+  return (Date.now() - lastUpdatedTime) > fiveMinutes;
 }
 
 /**
@@ -55,7 +60,10 @@ async function handleGetCachedImages(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=30');
   
   // 如果缓存未初始化或者已过期，则同步缓存
-  if (!isCacheInitialized() || isCacheExpired()) {
+  const isInitialized = await isCacheInitialized();
+  const isExpired = await isCacheExpired();
+  
+  if (!isInitialized || isExpired) {
     try {
       console.log('缓存需要更新，正在同步...');
       await syncCacheData();
@@ -66,12 +74,15 @@ async function handleGetCachedImages(req, res) {
   }
 
   // 返回缓存的图片
-  const cachedImages = getCachedImages();
-  console.log(`返回缓存中的 ${cachedImages.length} 张图片`);
+  const cachedImages = await getCachedImages();
+  const imagesArray = Array.isArray(cachedImages) ? cachedImages : [];
+  console.log(`返回缓存中的 ${imagesArray.length} 张图片`);
+  
   return res.status(200).json({ 
     success: true, 
-    images: cachedImages,
-    count: cachedImages.length
+    images: imagesArray,
+    count: imagesArray.length,
+    cacheType: getCurrentCacheType()
   });
 }
 
@@ -82,16 +93,18 @@ async function handleSyncCache(req, res) {
   try {
     console.log('收到缓存同步请求，正在同步...');
     await syncCacheData();
-    const cachedImages = getCachedImages();
+    const cachedImages = await getCachedImages();
+    const imagesArray = Array.isArray(cachedImages) ? cachedImages : [];
     
-    console.log(`缓存同步完成，当前缓存中有 ${cachedImages.length} 张图片`);
+    console.log(`缓存同步完成，当前缓存中有 ${imagesArray.length} 张图片`);
     
     // 添加缓存控制头
     res.setHeader('Cache-Control', 'no-cache');
     return res.status(200).json({ 
       success: true, 
       message: '缓存同步成功',
-      count: cachedImages.length
+      count: imagesArray.length,
+      cacheType: getCurrentCacheType()
     });
   } catch (error) {
     console.error('同步缓存失败:', error);
@@ -158,7 +171,7 @@ async function syncCacheData() {
     console.log(`格式化后有 ${formattedCloudImages.length} 张有效图片准备同步到缓存`);
 
     // 同步缓存
-    syncCache(localImages, formattedCloudImages);
+    await syncCache(localImages, formattedCloudImages);
     
     return true;
   } catch (error) {
