@@ -19,6 +19,7 @@ export async function POST(request) {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
+  
     
     // 检查每日生成限制
     const generationStatus = await checkGenerationLimit();
