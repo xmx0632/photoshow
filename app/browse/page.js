@@ -11,12 +11,12 @@ export default function BrowsePage() {
       
       <div className="mb-8">
         <p className="text-gray-600 dark:text-gray-300">
-          浏览您使用AI生成的所有图片。点击图片可以查看详情，您也可以下载或删除这些图片。
+          浏览您使用AI生成的所有图片。点击图片可以查看详情，您可以下载这些图片。如需管理或删除图片，请联系管理员。
         </p>
       </div>
       
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-        <ImageGrid />
+        <ImageGrid showDeleteButton={false} />
       </div>
     </div>
   );

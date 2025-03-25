@@ -7,8 +7,9 @@
  * @param {Object} props - 组件属性
  * @param {Object} props.image - 图片数据对象
  * @param {Function} props.onDelete - 删除图片的回调函数
+ * @param {boolean} props.showDeleteButton - 是否显示删除按钮，默认为 true
  */
-export function ImageCard({ image, onDelete }) {
+export function ImageCard({ image, onDelete, showDeleteButton = true }) {
   // 格式化日期
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -26,7 +27,7 @@ export function ImageCard({ image, onDelete }) {
       {/* 图片预览 */}
       <div className="relative aspect-w-1 aspect-h-1">
         <img
-          src={image.imageUrl}
+          src={image.imageUrl || image.url}
           alt={image.prompt}
           className="object-cover w-full h-full"
           loading="lazy"
@@ -44,9 +45,9 @@ export function ImageCard({ image, onDelete }) {
         </p>
         
         {/* 操作按钮 */}
-        <div className="flex justify-between mt-2">
+        <div className={`flex ${showDeleteButton ? 'justify-between' : 'justify-end'} mt-2`}>
           <a
-            href={image.imageUrl}
+            href={image.imageUrl || image.url}
             download="generated-image.png"
             target="_blank"
             rel="noopener noreferrer"
@@ -55,13 +56,15 @@ export function ImageCard({ image, onDelete }) {
             下载
           </a>
           
-          <button
-            onClick={() => onDelete(image.id)}
-            className="text-red-600 dark:text-red-400 hover:underline text-sm"
-            aria-label="删除图片"
-          >
-            删除
-          </button>
+          {showDeleteButton && (
+            <button
+              onClick={() => onDelete(image.id)}
+              className="text-red-600 dark:text-red-400 hover:underline text-sm"
+              aria-label="删除图片"
+            >
+              删除
+            </button>
+          )}
         </div>
       </div>
     </div>
