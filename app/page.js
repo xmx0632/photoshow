@@ -9,12 +9,12 @@ export default function Home() {
         欢迎使用 PhotoShow
       </h1>
       <p className="text-xl text-center mb-8 max-w-2xl">
-        基于 Gemini API 的智能图片生成平台，让创意变为现实
+        基于 AI 技术的智能图片生成平台，让创意变为现实
       </p>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mt-8">
-        <a 
-          href="/create" 
+        <a
+          href="/create"
           className="card p-6 hover:shadow-lg transition-shadow duration-300"
         >
           <h2 className="text-2xl font-semibold mb-4">创建图片</h2>
@@ -22,9 +22,9 @@ export default function Home() {
             输入提示词，使用 Gemini AI 生成独特的图片作品
           </p>
         </a>
-        
-        <a 
-          href="/browse" 
+
+        <a
+          href="/browse"
           className="card p-6 hover:shadow-lg transition-shadow duration-300"
         >
           <h2 className="text-2xl font-semibold mb-4">浏览图库</h2>
@@ -33,7 +33,7 @@ export default function Home() {
           </p>
         </a>
       </div>
-      
+
       <div className="mt-16 max-w-3xl text-center">
         <h3 className="text-2xl font-semibold mb-4">如何使用</h3>
         <ol className="text-left space-y-3">

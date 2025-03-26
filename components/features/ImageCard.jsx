@@ -23,7 +23,7 @@ export function ImageCard({ image, onDelete, showDeleteButton = true }) {
   };
 
   return (
-    <div className="card overflow-hidden transition-shadow duration-300 hover:shadow-lg">
+    <div className="card border border-gray-100 dark:border-gray-700">
       {/* 图片预览 */}
       <div className="relative aspect-w-1 aspect-h-1">
         <img
@@ -31,12 +31,13 @@ export function ImageCard({ image, onDelete, showDeleteButton = true }) {
           alt={image.prompt}
           className="object-cover w-full h-full"
           loading="lazy"
+          style={{ borderTopLeftRadius: '10px', borderTopRightRadius: '10px' }}
         />
       </div>
 
       {/* 图片信息 */}
-      <div className="p-4">
-        <h3 className="text-sm line-clamp-1 mb-2 text-gray-900 dark:text-gray-100" title={image.prompt}>
+      <div className="p-5">
+        <h3 className="text-sm font-medium line-clamp-1 mb-2 text-gray-900 dark:text-gray-100" title={image.prompt}>
           {image.prompt}
         </h3>
 

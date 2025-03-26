@@ -21,10 +21,8 @@ export function ImageGenerationForm() {
   const [generationLimit, setGenerationLimit] = useState(null);
   const [generationCount, setGenerationCount] = useState(null);
 
-  // 计算剩余生成次数
-  const remainingGenerations = generationLimit !== null && generationCount !== null
-    ? Math.max(0, generationLimit - generationCount)
-    : null;
+  // 剩余生成次数
+  const [remainingGenerations, setRemainingGenerations] = useState(null);
 
   /**
    * 生成图片
@@ -54,6 +52,7 @@ export function ImageGenerationForm() {
       if (data.limit) {
         setGenerationLimit(data.limit);
         setGenerationCount(data.currentCount || 0);
+        setRemainingGenerations(data.remaining || 0);
       }
 
       if (!response.ok) {
@@ -101,6 +100,7 @@ export function ImageGenerationForm() {
       const data = await response.json();
       setGenerationLimit(data.limit);
       setGenerationCount(data.currentCount);
+      setRemainingGenerations(data.remaining);
     } catch (err) {
       console.error('获取生成限制状态失败:', err);
       setError('获取生成限制状态失败');
@@ -136,36 +136,38 @@ export function ImageGenerationForm() {
     <div>
       {/* 错误提示 */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          <p>{error}</p>
-          <button
-            className="underline ml-2"
-            onClick={() => setError(null)}
-          >
-            关闭
-          </button>
+        <div className="bg-red-50 border border-apple-red text-red-700 px-5 py-4 rounded-apple mb-5 shadow-sm">
+          <div className="flex justify-between items-center">
+            <p className="font-medium">{error}</p>
+            <button
+              className="text-apple-red hover:text-red-800 transition-colors ml-3"
+              onClick={() => setError(null)}
+            >
+              关闭
+            </button>
+          </div>
         </div>
       )}
 
       {/* 每日生成限制提示 */}
-      <div className="mb-4 flex justify-between items-center">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="mb-5 flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-3 rounded-apple">
+        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
           每日限制: {generationLimit !== null ? `${generationLimit} 张` : '加载中...'}
         </div>
-        <div className={`text-sm ${remainingGenerations !== null ? (remainingGenerations > 5 ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400') : 'text-gray-400'}`}>
+        <div className={`text-sm font-medium ${remainingGenerations !== null ? (remainingGenerations > 5 ? 'text-apple-green' : 'text-apple-orange') : 'text-gray-400'}`}>
           剩余: {remainingGenerations !== null ? `${remainingGenerations} 张` : '加载中...'}
         </div>
       </div>
 
       {/* 提示词输入 */}
-      <div className="mb-4">
-        <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      <div className="mb-5">
+        <label htmlFor="prompt" className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">
           输入提示词
         </label>
         <textarea
           id="prompt"
           rows="4"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+          className="input-field"
           placeholder="描述您想要生成的图片，例如：一只在雪地上奔跑的狼，背景是满月和雪松林"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
@@ -176,9 +178,9 @@ export function ImageGenerationForm() {
       <button
         onClick={generateImage}
         disabled={isGenerating || !prompt.trim() || remainingGenerations <= 0}
-        className={`w-full py-2 px-4 rounded-md text-white font-medium ${isGenerating || !prompt.trim() || remainingGenerations <= 0
+        className={`w-full py-3 px-5 rounded-apple text-white font-medium transition-all duration-300 ${isGenerating || !prompt.trim() || remainingGenerations <= 0
           ? 'bg-gray-400 cursor-not-allowed'
-          : 'bg-blue-600 hover:bg-blue-700'
+          : 'bg-apple-blue hover:bg-blue-600 shadow-apple hover:shadow-apple-hover'
           }`}
       >
         {isGenerating ? '生成中...' :
@@ -187,9 +189,9 @@ export function ImageGenerationForm() {
 
       {/* 生成的图片 */}
       {generatedImage && (
-        <div className="mt-6">
-          <h3 className="text-lg font-medium mb-2">生成结果</h3>
-          <div className="border rounded-lg overflow-hidden">
+        <div className="mt-8">
+          <h3 className="text-lg font-medium mb-3 apple-heading">生成结果</h3>
+          <div className="border border-gray-200 dark:border-gray-700 rounded-apple overflow-hidden shadow-apple">
             <div className="relative aspect-square max-h-96">
               <Image
                 src={generatedImage}

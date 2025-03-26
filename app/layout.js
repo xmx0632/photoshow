@@ -5,7 +5,7 @@ import { Analytics } from '@vercel/analytics/next';
 
 export const metadata = {
   title: 'PhotoShow - AI图片生成',
-  description: '使用Gemini API生成精美图片的在线平台',
+  description: '使用AI技术生成精美图片的在线平台',
 };
 
 /**
